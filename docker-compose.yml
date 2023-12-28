@@ -1,0 +1,85 @@
+version: '3.8'
+
+name: chat
+
+services:
+  reverse-proxy:
+    restart: on-failure
+    image: traefik:2.10
+    ports:
+      - "80:80"
+      - "27017:27017"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    command:
+      - --log.level=INFO
+      - --accesslog.filepath=/var/log/access.log
+      - --accesslog.bufferingsize=100
+      - --api.dashboard=true
+      - --providers.docker
+      - --entrypoints.web.address=:80
+      - --entrypoints.db.address=:27017
+    labels:
+      - traefik.http.routers.dashboard.rule=Host(`traefik.chat.test`) && PathPrefix(`/api`, `/dashboard`)
+      - traefik.http.routers.dashboard.service=api@internal
+      - traefik.http.routers.dashboard.middlewares=auth
+      - traefik.http.middlewares.auth.basicauth.users=admin:$$2a$$12$$ujfhuxcYz8BTIgTVH13dru9fyLucun8.DqdF/5zD08CJ02CVaMa4i #admin:password
+
+  db:
+    restart: on-failure
+    image: mongo:7
+    expose:
+      - 27017
+    volumes:
+      - chat-db-data:/data/db
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: username
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: database
+    labels:
+      - traefik.tcp.routers.db.rule=HostSNI(`*`)
+      - traefik.tcp.routers.db.entrypoints=db
+
+  api:
+    restart: on-failure
+    depends_on:
+      - db
+    build:
+      context: ../chat-api
+      dockerfile: ../chat-container/Dockerfile
+      target: api
+    image: chat-api
+    volumes:
+      - ../chat-api/:/app/
+      - /app/node_modules/
+    command: sh -c "yarn dev"
+    expose:
+      - "3000"
+    env_file:
+      - ../chat-api/.env
+    labels:
+      - traefik.http.routers.api.rule=Host(`api.chat.test`)
+      - traefik.http.routers.api.entrypoints=web
+
+  app:
+    restart: on-failure
+    build:
+      context: ../chat-app
+      dockerfile: ../chat-container/Dockerfile
+      target: app
+    image: chat-app
+    volumes:
+      - ../chat-app/:/app/
+      - /app/node_modules/
+    command: sh -c "yarn dev --host 0.0.0.0"
+    expose:
+      - "5173"
+    env_file:
+      - ../chat-app/.env
+    labels:
+      - traefik.http.routers.app.rule=Host(`chat.test`)
+      - traefik.http.routers.app.entrypoints=web
+
+volumes:
+  chat-db-data:
+    external: true
