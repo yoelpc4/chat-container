@@ -4,6 +4,8 @@ Container for chatting peer-to-peer with any registered users
 
 ## Setup
 
+Create folder `chat` on your project then clone this project with folder name `chat-container`.
+\
 On `/etc/hosts` or `C:\Windows\System32\drivers\etc\hosts` file register local domains alias mapped to the localhost IP address
 
 ```
