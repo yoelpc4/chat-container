@@ -1,4 +1,4 @@
-# Chat API
+# Chat Container
 
 Container for chatting peer-to-peer with any registered users
 
